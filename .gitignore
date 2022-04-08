@@ -1,0 +1,21 @@
+# IDE generated files #
+######################
+nbproject
+.idea
+.vscode
+.buildpath
+.project
+.settings/
+backup
+_cache
+atlassian*
+
+### Vagrant template
+# General
+.vagrant/
+ssl/
+logs/
+Vagrant.yml
+
+# Log files (if you are creating logs in debug mode, uncomment this)
+# *.log
