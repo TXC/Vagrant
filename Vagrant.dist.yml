@@ -6,6 +6,7 @@ cpus: 2
 gui: "off"
 #natdnshostresolver: "off"
 #natdnsproxy: "off"
+timezone: "Etc/UTC"
 
 authorize:
   - ~/.ssh/id_ed25519.pub

@@ -21,7 +21,9 @@ class Skeleton
     # Configure A Few VirtualBox Settings
     config.vm.provider "virtualbox" do |vb|
       vb.name = 'vagrant'
-      vb.gui = settings["gui"] ||= "off"
+      if settings.has_key?("gui")
+        vb.gui = settings["gui"]
+      end
       vb.customize [
         "modifyvm", :id,
         "--memory", settings["memory"] ||= "2048",
@@ -65,10 +67,10 @@ class Skeleton
 
     config.vm.provision "shell",
       privileged: true,
-      args: [hostIP],
+      args: [hostIP, settings["timezone"] ||= "Etc/UTC"],
       path: "./vagrant/install.sh"
 
-    configFiles = [ "apache", "redis", "db", "php" ]
+    configFiles = [ "apache", "redis", "db", "php", "nvm" ]
     configFiles.each do |app|
       config.vm.provision "shell",
         privileged: true,
@@ -100,6 +102,13 @@ class Skeleton
            path: "./vagrant/configure-postfix.sh"
     end
 
+    # Register All Of The Configured Shared Folders
+    if settings['folders'].kind_of?(Array)
+      settings["folders"].each do |folder|
+        config.vm.synced_folder folder["map"], folder["to"], type: folder["type"] ||= nil
+      end
+    end
+
     # Add Configured Apache Sites
     if settings['sites'].kind_of?(Array)
       config.vm.provision "shell",
@@ -125,7 +134,18 @@ class Skeleton
 
     config.vm.provision "shell",
       privileged: true,
-      inline: "services=\"apache2\"; for f in /etc/php/*; do dir=${f##*/} ; services=\"$services php$dir-fpm\"; done; systemctl restart $services"
+      inline: <<-SH
+services="apache2";
+for f in /etc/php/*; do
+  if [ ! -d "${f}" ]; then
+    continue;
+  fi;
+  dir=${f##*/}
+  services="$services php$dir-fpm";
+done;
+systemctl restart $services
+
+SH
 
     if Vagrant.has_plugin? 'vagrant-hostsupdater'
       # Remove hosts when suspending too
@@ -156,13 +176,6 @@ class Skeleton
             inline: "echo \"$1\" > /home/vagrant/.ssh/$2 && chmod 600 /home/vagrant/.ssh/$2",
             args: [File.read(File.expand_path(key)), key.split('/').last]
         end
-      end
-    end
-
-    # Register All Of The Configured Shared Folders
-    if settings['folders'].kind_of?(Array)
-      settings["folders"].each do |folder|
-        config.vm.synced_folder folder["map"], folder["to"], type: folder["type"] ||= nil
       end
     end
 

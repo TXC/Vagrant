@@ -7,14 +7,16 @@ ARG_PHPVERSION=$4
 ARG_404=$5
 COMMONKEY=$(echo $ARG_HOST |openssl dgst -sha384 |sed 's/^.* //'|cut -c1-8)
 SSLDays="3650"
+PHP_BASEDIR=$(findmnt -n --target $ARG_DOCROOT | awk '{ print $1 }')
 
-mkdir -p "/etc/apache2/sites-available" "/etc/apache2/sites-enabled" "/vagrant/logs"
+mkdir -p "/etc/apache2/sites-available" "/etc/apache2/sites-enabled" "/vagrant/logs" "/vagrant/logs/php${ARG_PHPVERSION}"
 
 echo "Setting up VHOST \"$ARG_HOST\""
 
 block="  UseCanonicalName Off
   Define PHPSOCKET $COMMONKEY
   Define PHPVERSION $ARG_PHPVERSION
+  Define PHPBASEDIR $PHP_BASEDIR
   DocumentRoot $ARG_DOCROOT
   <Directory />
     Options -Indexes
@@ -66,9 +68,8 @@ tmpfile=$(mktemp /tmp/fpm_conf.XXXXXX)
 block="[$COMMONKEY]
 listen = /run/php/$COMMONKEY-%VERSION%.sock
 
-php_admin_value[open_basedir] = \"$ARG_DOCROOT:/tmp\"
-
-php_admin_value[error_log] = /vagrant/logs/php-fpm.\$pool.error.log
+php_admin_value[open_basedir] = \"$PHP_BASEDIR:/tmp\"
+php_admin_value[error_log] = /vagrant/logs/php%VERSION%/php-fpm.\$pool.error.log
 php_admin_flag[log_errors] = on
 
 include = \"/etc/php/common.conf\"

@@ -13,6 +13,7 @@ php8.0-intl
 php8.0-lz4
 php8.0-mbstring
 php8.0-mcrypt
+php8.0-memcache
 php8.0-memcached
 php8.0-mysql
 php8.0-opcache

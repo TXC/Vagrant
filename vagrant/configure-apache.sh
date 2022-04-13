@@ -7,8 +7,16 @@ echo "CONFIGURING APACHE"
 mkdir -p /vagrant/logs
 chown -R vagrant: /vagrant/logs
 
+echo -n "SETTING envvars..."
 sed -i "s/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=vagrant/" /etc/apache2/envvars
 sed -i "s/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=vagrant/" /etc/apache2/envvars
+sed -i "s#^export APACHE_LOG_DIR=.*#export APACHE_LOG_DIR=/vagrant/logs/apache2\$SUFFIX#" /etc/apache2/envvars
+(
+  source /etc/apache2/envvars;
+  mkdir -p $APACHE_LOG_DIR;
+  chown -R vagrant: $APACHE_LOG_DIR;
+)
+echo "DONE"
 
 block="FileETag None
 
@@ -100,17 +108,25 @@ block="<IfModule headers_module>
 echo "$block" > /etc/apache2/includes/modules.conf
 
 block="<IfModule php5_module>
+  <IfDefine PHPBASEDIR>
+    php_admin_value open_basedir \"\${PHPBASEDIR}:/tmp\"
+  </IfDefine>
+  <IfDefine !PHPBASEDIR>
     php_admin_value open_basedir \"%{DOCUMENT_ROOT}:/tmp\"
-    php_admin_value session.save_handler = \"redis\"
-    php_admin_value session.save_path = \"tcp://127.0.0.1:6379\"
-    #php_admin_value session.save_path \"/var/lib/php/sessions/\"
+  </IfDefine>
+  php_admin_value session.save_handler = \"redis\"
+  php_admin_value session.save_path = \"tcp://127.0.0.1:6379\"
 </IfModule>
 
 <IfModule php7_module>
+  <IfDefine PHPBASEDIR>
+    php_admin_value open_basedir \"\${PHPBASEDIR}:/tmp\"
+  </IfDefine>
+  <IfDefine !PHPBASEDIR>
     php_admin_value open_basedir \"%{DOCUMENT_ROOT}:/tmp\"
+  </IfDefine>
     php_admin_value session.save_handler = \"redis\"
     php_admin_value session.save_path = \"tcp://127.0.0.1:6379\"
-    #php_admin_value session.save_path \"/var/lib/php/sessions/\"
 </IfModule>
 
 <IfModule fastcgi_module>
@@ -127,7 +143,7 @@ block="<IfModule php5_module>
         FastCgiExternalServer /usr/lib/cgi-bin/php-fcgi-\${PHPSOCKET}-%{SERVER_PORT} -socket /run/php/\${PHPSOCKET}-\${PHPVERSION}.sock -pass-header Authorization -idle-timeout 30000 -flush
     </IfDefine>
     <IfDefine !PHPVERSION>
-        FastCgiExternalServer /usr/lib/cgi-bin/php-fcgi-\${PHPSOCKET}-%{SERVER_PORT} -socket /run/php/\${PHPSOCKET}-7.4.sock -pass-header Authorization -idle-timeout 30000 -flush
+        FastCgiExternalServer /usr/lib/cgi-bin/php-fcgi-\${PHPSOCKET}-%{SERVER_PORT} -socket /run/php/\${PHPSOCKET}-8.1.sock -pass-header Authorization -idle-timeout 30000 -flush
     </IfDefine>
 </IfModule>
 
@@ -137,7 +153,7 @@ block="<IfModule php5_module>
             SetHandler \"proxy:unix:/run/php/\${PHPSOCKET}-\${PHPVERSION}.sock|fcgi://localhost\"
         </IfDefine>
         <IfDefine !PHPVERSION>
-            SetHandler \"proxy:unix:/run/php/\${PHPSOCKET}-7.4.sock|fcgi://localhost\"
+            SetHandler \"proxy:unix:/run/php/\${PHPSOCKET}-8.1.sock|fcgi://localhost\"
         </IfDefine>
     </FilesMatch>
 </IfModule>
@@ -145,11 +161,14 @@ block="<IfModule php5_module>
 # We need to Unset these variables everytime, since they leak!
 Undefine PHPSOCKET
 Undefine PHPVERSION
+Undefine PHPBASEDIR
 ";
 echo "$block" > /etc/apache2/includes/php.conf
 
+echo -n "SETTING mod_ssl..."
 sed -i "s/SSLCipherSuite.*/SSLCipherSuite HIGH:!MEDIUM:!aNULL:!MD5:!RC4/" "/etc/apache2/mods-available/ssl.conf"
 sed -i "s/SSLProtocol.*/SSLProtocol -ALL +TLSv1.2 +TLSv1.3/" "/etc/apache2/mods-available/ssl.conf"
+echo "DONE"
 
 a2enconf vagrant
 a2dismod mpm_event mpm_prefork mpm_worker

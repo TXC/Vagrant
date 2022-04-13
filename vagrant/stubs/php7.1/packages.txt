@@ -14,6 +14,7 @@ php7.1-json
 php7.1-lz4
 php7.1-mbstring
 php7.1-mcrypt
+php7.1-memcache
 php7.1-memcached
 php7.1-mysql
 php7.1-opcache

@@ -8,17 +8,12 @@ SASLPASSWD="/etc/postfix/sasl_passwd"
 
 debconf-set-selections <<< "postfix postfix/mailname string vagrant.localhost"
 debconf-set-selections <<< "postfix postfix/main_mailer_type string 'Internet Site'"
+debconf-set-selections <<< "postfix	postfix/relayhost	string '[smtp.mailtrap.io]:2525'"
 apt-get -qqy -o Dpkg::Use-Pty=0 install postfix
 
 echo "CONFIGURING Postfix"
 
 # This will quite verbose
-grep -q -F 'smtprelay =' $POSTFIXCONFIG
-if [ $? -ne 0 ]; then
-  echo 'smtprelay = [smtp.mailtrap.io]:2525' >> $POSTFIXCONFIG
-else
-  sed -i "s/^smtprelay = .*/smtprelay = [smtp.mailtrap.io]:2525/" $POSTFIXCONFIG
-fi
 
 grep -q -F 'smtp_sasl_auth_enable =' $POSTFIXCONFIG
 if [ $? -ne 0 ]; then
@@ -48,6 +43,6 @@ else
   sed -i "s/^smtp_sasl_password_maps = .*/smtp_sasl_password_maps = hash:$SASLPASSWD" $POSTFIXCONFIG
 fi
 
-echo "smtp.mailtrap.io 089417a30967cc:a0bcbbf6e95541" > $SASLPASSWD
+echo "smtp.mailtrap.io $MAILTRAP_USERNAME:$MAILTRAP_PASSWORD" > $SASLPASSWD
 postmap $SASLPASSWD
 systemctl restart postfix
