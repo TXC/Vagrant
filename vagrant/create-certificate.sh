@@ -3,6 +3,9 @@
 set -f
 PATH_SSL="/vagrant/ssl"
 SSLHOST="$(hostname)"
+ARG_HOST=$1
+
+COMMONKEY=$(echo ARG_HOST |openssl dgst -sha384 |sed 's/^.* //'|cut -c1-8)
 
 # Path to the custom Root CA certificate.
 PATH_ROOT_CNF="${PATH_SSL}/ca.${SSLHOST}.cnf"
@@ -10,10 +13,10 @@ PATH_ROOT_CRT="${PATH_SSL}/ca.${SSLHOST}.crt"
 PATH_ROOT_KEY="${PATH_SSL}/ca.${SSLHOST}.key"
 
 # Path to the custom site certificate.
-PATH_CNF="${PATH_SSL}/${1}.cnf"
-PATH_CRT="${PATH_SSL}/${1}.crt"
-PATH_CSR="${PATH_SSL}/${1}.csr"
-PATH_KEY="${PATH_SSL}/${1}.key"
+PATH_CNF="${PATH_SSL}/$ARG_HOST.cnf"
+PATH_CRT="${PATH_SSL}/$ARG_HOST.crt"
+PATH_CSR="${PATH_SSL}/$ARG_HOST.csr"
+PATH_KEY="${PATH_SSL}/$ARG_HOST.key"
 
 # Certicate valid
 SSLDays="3650"
@@ -97,8 +100,7 @@ CN = ${SSLHOST} Root CA
 fi
 
 # Only generate a certificate if there isn't one already there.
-if [ ! -f $PATH_CNF ] || [ ! -f $PATH_KEY ] || [ ! -f $PATH_CRT ]
-then
+if [ ! -f $PATH_CNF ] || [ ! -f $PATH_KEY ] || [ ! -f $PATH_CRT ]; then
     # Uncomment the global 'copy_extentions' OpenSSL option to ensure the SANs are copied into the certificate.
     sed -i '/copy_extensions\ =\ copy/s/^#\ //g' /etc/ssl/openssl.cnf
 
@@ -108,11 +110,11 @@ ${BASE_CNF}
 [ req_distinguished_name ]
 O  = Vagrant
 C  = UN
-CN = $1
+CN = $ARG_HOST
 
 [ alternate_names ]
-DNS.1 = $1
-DNS.2 = *.$1
+DNS.1 = $ARG_HOST
+DNS.2 = *.$ARG_HOST
 "
     echo "$cnf" > $PATH_CNF
 

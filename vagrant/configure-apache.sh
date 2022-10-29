@@ -6,6 +6,7 @@ echo "CONFIGURING APACHE"
 
 mkdir -p /vagrant/logs
 chown -R vagrant: /vagrant/logs
+mkdir -p /etc/apache2/includes
 
 echo -n "SETTING envvars..."
 sed -i "s/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=vagrant/" /etc/apache2/envvars
@@ -14,7 +15,7 @@ sed -i "s#^export APACHE_LOG_DIR=.*#export APACHE_LOG_DIR=/vagrant/logs/apache2\
 (
   source /etc/apache2/envvars;
   mkdir -p $APACHE_LOG_DIR;
-  chown -R vagrant: $APACHE_LOG_DIR;
+  sudo chown -R vagrant: $APACHE_LOG_DIR;
 )
 echo "DONE"
 
@@ -31,21 +32,11 @@ block="FileETag None
 ";
 echo "$block" > /etc/apache2/conf-available/vagrant.conf
 
-mkdir -p /etc/apache2/includes
 block="<IfModule mpm_itk_module>
     AssignUserId vagrant vagrant
 </IfModule>
 ";
-echo "$block" > /etc/apache2/includes/itk.conf
-
-block="LogFormat \"%v:%p %h %l %u %t \\\"%r\\\" %>s %B \\\"%{Referer}i\\\" \\\"%{User-Agent}i\\\"\" h2_vhost_combined
-LogFormat \"%h %l %u %t \\\"%r\\\" %>s %B \\\"%{Referer}i\\\" \\\"%{User-Agent}i\\\"\" h2_combined
-LogFormat \"%h %l %u %t \\\"%r\\\" %>s %B\" h2_common
-
-ErrorLog \${APACHE_LOG_DIR}/\${PHPSOCKET}_error.log
-CustomLog \${APACHE_LOG_DIR}/\${PHPSOCKET}_access.log h2_vhost_combined
-";
-echo "$block" > /etc/apache2/includes/logging.conf
+echo "$block" > /etc/apache2/conf-available/itk.conf
 
 block="<IfModule headers_module>
     Header always set Strict-Transport-Security \"max-age=63072000; includeSubDomains\"
@@ -105,7 +96,16 @@ block="<IfModule headers_module>
   H2Upgrade on
 </IfModule>
 ";
-echo "$block" > /etc/apache2/includes/modules.conf
+echo "$block" > /etc/apache2/conf-available/modules.conf
+
+block="LogFormat \"%v:%p %h %l %u %t \\\"%r\\\" %>s %B \\\"%{Referer}i\\\" \\\"%{User-Agent}i\\\"\" h2_vhost_combined
+LogFormat \"%h %l %u %t \\\"%r\\\" %>s %B \\\"%{Referer}i\\\" \\\"%{User-Agent}i\\\"\" h2_combined
+LogFormat \"%h %l %u %t \\\"%r\\\" %>s %B\" h2_common
+
+ErrorLog \${APACHE_LOG_DIR}/\${PHPSOCKET}_error.log
+CustomLog \${APACHE_LOG_DIR}/\${PHPSOCKET}_access.log h2_vhost_combined
+";
+echo "$block" > /etc/apache2/includes/logging.conf
 
 block="<IfModule php5_module>
   <IfDefine PHPBASEDIR>
@@ -165,11 +165,27 @@ Undefine PHPBASEDIR
 ";
 echo "$block" > /etc/apache2/includes/php.conf
 
+block="
+  <Directory />
+    Options -Indexes
+    AllowOverride All
+  </Directory>
+  <Directory %{DOCUMENT_ROOT}>
+    Options -Indexes
+    AllowOverride All
+    Order allow,deny
+    allow from all
+    Require all granted
+  </Directory>
+  Options -Includes
+";
+echo "$block" > /etc/apache2/includes/vhost.conf
+
 echo -n "SETTING mod_ssl..."
 sed -i "s/SSLCipherSuite.*/SSLCipherSuite HIGH:!MEDIUM:!aNULL:!MD5:!RC4/" "/etc/apache2/mods-available/ssl.conf"
 sed -i "s/SSLProtocol.*/SSLProtocol -ALL +TLSv1.2 +TLSv1.3/" "/etc/apache2/mods-available/ssl.conf"
 echo "DONE"
 
-a2enconf vagrant
+a2enconf vagrant itk modules
 a2dismod mpm_event mpm_prefork mpm_worker
 a2enmod actions cgid expires headers mpm_event http2 proxy_fcgi rewrite ssl

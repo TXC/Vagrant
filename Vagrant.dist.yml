@@ -1,6 +1,5 @@
 ---
 hostname: "boxname.local"
-ip: "192.168.123.4"
 memory: 1024
 cpus: 2
 gui: "off"
@@ -22,6 +21,9 @@ mailtrap:
 
 networking:
   - public: false
+    ip: "192.168.123.4"
+  - public: true
+    type: "dhcp"
 
 folders:
   - map: ../Projects/project1

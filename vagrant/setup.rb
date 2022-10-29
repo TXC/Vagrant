@@ -1,21 +1,42 @@
 class Skeleton
   def Skeleton.configure(config, settings)
     # Configure The Box
-    config.vm.box = "ubuntu/focal64"
+    #config.vm.box = "ubuntu/focal64"
+    config.vm.box = "roboxes/ubuntu2004"
     config.vm.hostname = settings["hostname"] ||= "vagrant.local"
     domains = []
+    hostIP = ""
 
-    vmIP = settings["ip"] ||= "192.168.121.7"
-    hostIP = vmIP.split(".");
-    hostIP.pop
-    hostIP.push(1)
-    hostIP = hostIP.join(".")
+    if settings.has_key?("networking")
+      if hostIP.empty?
+        hostIP = settings["networking"][0]["ip"].split(".");
+        hostIP.pop
+        hostIP.push(1)
+        hostIP = hostIP.join(".")
+      end
 
-    # Configure A Private Network IP
-    config.vm.network :private_network, ip: vmIP
+      settings["networking"].each do |net|
+        if net.has_key?("network")
+          network = net["network"] ? "public_network" : "private_network"
+        else
+          network = "private_network"
+        end
 
-    if settings['networking'][0]['public']
-      config.vm.network "public_network", type: "dhcp"
+        config.vm.network network,
+          ip: net["ip"] ||= nil,
+          type: net["type"] ||= nil,
+          netmask: net["netmask"] ||= nil
+      end
+    end
+
+    # Configure A Few VMWare Desktop Settings
+    config.vm.provider :vmware_desktop do |v|
+      #v.name = 'vagrant'
+      if settings.has_key?("gui")
+        v.gui = settings["gui"]
+      end
+      v.vmx["memsize"] = settings["memory"] ||= "2048"
+      v.vmx["numvcpus"] = settings["cpus"] ||= "1"
     end
 
     # Configure A Few VirtualBox Settings
@@ -28,16 +49,27 @@ class Skeleton
         "modifyvm", :id,
         "--memory", settings["memory"] ||= "2048",
         "--cpus", settings["cpus"] ||= "1",
-        "--ostype", "Debian_64",
-        #"--cpuexecutioncap", settings["cpuexecutioncap"] ||= "80",
-        #"--ioapic", settings["ioapic"] ||= "on",
-        #"--graphicscontroller", settings["graphicscontroller"] ||= "vmsvga",
-        "--audio", "none",
-        "--usb", "off",
-        "--usbehci", "off",
         "--natdnshostresolver1", settings["natdnshostresolver"] ||= "on",
-        "--natdnsproxy1", settings["natdnsproxy"] ||= "on",
+        "--natdnsproxy1", settings["natdnsproxy"] ||= "on"
       ]
+    end
+
+    # Configure Port Forwarding To The Box
+    # Add Custom Ports From Configuration
+    if settings.has_key?("ports")
+      settings["ports"].each do |port|
+        config.vm.network "forwarded_port",
+          guest: port["guest"],
+          host: port["host"],
+          protocol: port["protocol"] ||= "tcp"
+      end
+    end
+
+    # Register All Of The Configured Shared Folders
+    if settings['folders'].kind_of?(Array)
+      settings["folders"].each do |folder|
+        config.vm.synced_folder folder["map"], folder["to"], type: folder["type"] ||= nil
+      end
     end
 
     config.vm.provision "file",
@@ -78,35 +110,12 @@ class Skeleton
         path: "./vagrant/configure-" + app + ".sh"
     end
 
-    # Configure Port Forwarding To The Box
-    #config.vm.network "forwarded_port", guest: 22, host: 2222
-    config.vm.network "forwarded_port", guest: 80, host: 8000
-    config.vm.network "forwarded_port", guest: 443, host: 44300
-    config.vm.network "forwarded_port", guest: 3306, host: 33060
-
-    # Add Custom Ports From Configuration
-    if settings.has_key?("ports")
-      settings["ports"].each do |port|
-        config.vm.network "forwarded_port",
-          guest: port["guest"],
-          host: port["host"],
-          protocol: port["protocol"] ||= "tcp"
-      end
-    end
-
    # Configure Mailtrap.io for Postfix
     if settings.has_key?("mailtrap") && settings["mailtrap"].has_key?("username") && settings["mailtrap"].has_key?("password")
-         config.vm.provision "shell",
-           privileged: true,
-           args: [settings["mailtrap"]["username"], settings["mailtrap"]["password"]],
-           path: "./vagrant/configure-postfix.sh"
-    end
-
-    # Register All Of The Configured Shared Folders
-    if settings['folders'].kind_of?(Array)
-      settings["folders"].each do |folder|
-        config.vm.synced_folder folder["map"], folder["to"], type: folder["type"] ||= nil
-      end
+      config.vm.provision "shell",
+        privileged: true,
+        args: [settings["mailtrap"]["username"], settings["mailtrap"]["password"]],
+        path: "./vagrant/configure-postfix.sh"
     end
 
     # Add Configured Apache Sites
@@ -143,8 +152,8 @@ for f in /etc/php/*; do
   dir=${f##*/}
   services="$services php$dir-fpm";
 done;
+echo "RESTARTING: $servcies"
 systemctl restart $services
-
 SH
 
     if Vagrant.has_plugin? 'vagrant-hostsupdater'
