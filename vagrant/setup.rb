@@ -24,8 +24,8 @@ class Skeleton
 
         config.vm.network network,
           ip: net["ip"] ||= nil,
-          type: net["type"] ||= nil,
-          netmask: net["netmask"] ||= nil
+#          netmask: net["netmask"] ||= nil,
+          type: net["type"] ||= nil
       end
     end
 
