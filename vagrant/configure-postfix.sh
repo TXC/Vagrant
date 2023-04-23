@@ -1,7 +1,17 @@
 #!/bin/bash
 
-MAILTRAP_USERNAME=$1
-MAILTRAP_PASSWORD=$2
+if [ ! -f "/root/vagrant_conf.sh" ]; then
+  echo "Missing config file!" >&2
+  return 1;
+fi;
+
+source /root/vagrant_conf.sh
+
+if [ -z "${MAILTRAP_USERNAME}" ] || [ -z "${MAILTRAP_PASSWORD}" ]; then
+  echo "Mailtrap Username and/or Password is not configured."
+  echo "Skipping configuration..."
+  return 0;
+fi;
 
 POSTFIXCONFIG="/etc/postfix/main.cf"
 SASLPASSWD="/etc/postfix/sasl_passwd"
@@ -13,35 +23,26 @@ apt-get -qqy -o Dpkg::Use-Pty=0 install postfix
 
 echo "CONFIGURING Postfix"
 
-# This will quite verbose
+LIST=(
+  "smtp_sasl_auth_enable = yes"
+  "smtp_sasl_mechanism_filter = plain"
+  "smtp_sasl_security_options = noanonymous"
+  "smtp_sasl_password_maps = hash\:${SASLPASSWD}"
+)
 
-grep -q -F 'smtp_sasl_auth_enable =' $POSTFIXCONFIG
-if [ $? -ne 0 ]; then
-  echo 'smtp_sasl_auth_enable = yes' >> $POSTFIXCONFIG
-else
-  sed -i "s/^smtp_sasl_auth_enable = .*/smtp_sasl_auth_enable = yes/" $POSTFIXCONFIG
-fi
+for i in "${LIST[@]}"; do
+  KEY=$(echo $i | awk '{ print $1 }')
+  VAL=$(echo $i | awk '{ print $3 }')
 
-grep -q -F 'smtp_sasl_mechanism_filter =' $POSTFIXCONFIG
-if [ $? -ne 0 ]; then
-  echo 'smtp_sasl_mechanism_filter = plain' >> $POSTFIXCONFIG
-else
-  sed -i "s/^smtp_sasl_mechanism_filter = .*/smtp_sasl_mechanism_filter = plain/" $POSTFIXCONFIG
-fi
+  echo "Checking: ${KEY}"
 
-grep -q -F 'smtp_sasl_security_options =' $POSTFIXCONFIG
-if [ $? -ne 0 ]; then
-  echo 'smtp_sasl_security_options = noanonymous' >> $POSTFIXCONFIG
-else
-  sed -i "s/^smtp_sasl_security_options = .*/smtp_sasl_security_options = noanonymous/" $POSTFIXCONFIG
-fi
-
-grep -q -F 'smtp_sasl_password_maps =' $POSTFIXCONFIG
-if [ $? -ne 0 ]; then
-  echo "smtp_sasl_password_maps = hash:$SASLPASSWD" >> $POSTFIXCONFIG
-else
-  sed -i "s/^smtp_sasl_password_maps = .*/smtp_sasl_password_maps = hash:$SASLPASSWD" $POSTFIXCONFIG
-fi
+  grep -q -F "${KEY} =" $POSTFIXCONFIG
+  if [ $? -ne 0 ]; then
+    sed -i "s#^${KEY} = .*#${KEY} = ${VAL}#" $POSTFIXCONFIG
+  else
+    echo "${KEY} = ${VAL}" >> $POSTFIXCONFIG
+  fi
+done
 
 echo "smtp.mailtrap.io $MAILTRAP_USERNAME:$MAILTRAP_PASSWORD" > $SASLPASSWD
 postmap $SASLPASSWD

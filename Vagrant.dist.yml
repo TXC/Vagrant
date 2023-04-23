@@ -15,6 +15,15 @@ keys:
   - ~/.ssh/id_ed25519
   - ~/.ssh/id_rsa
 
+path:
+  path: /vagrant/sites
+  logs: /vagrant/logs
+
+ssl:
+  name: vagrant       # Defaults to hostname
+  days: 3650          # Defaults to 3650
+  path: /vagrant/ssl  # Defaults to /vagrant/ssl
+
 mailtrap:
   username: abcdefg1234567
   password: 1234567abcdefg
@@ -31,6 +40,11 @@ folders:
   - map: ../Projects/project2
     to: /var/www/project2
 
+httpd: nginx
+#httpd: apache2
+
+dotnet: "7.0"
+
 php:
   - "5.6"
 #  - "7.0"
@@ -45,11 +59,18 @@ sites:
   - hostname: project1.local
     to: /var/www/project1/public
     ssl: true
-    php: 7.4
+    php: "7.4"
   - hostname: project2.local
     to: /var/www/project2/public
     ssl: false
-    php: 5.6
+    php: "5.6"
+  - hostname: project3.local
+    to: /var/www/project3/public
+    ssl: false
+  - hostname: project4.local
+    to: /var/www/project4/public
+    ssl: false
+    dotnet: "7.0"
 
 databases:
   - project1

@@ -7,7 +7,7 @@ class Skeleton
     domains = []
     hostIP = ""
 
-    if settings.has_key?("networking")
+    if settings.key?("networking")
       if hostIP.empty?
         hostIP = settings["networking"][0]["ip"].split(".");
         hostIP.pop
@@ -16,7 +16,7 @@ class Skeleton
       end
 
       settings["networking"].each do |net|
-        if net.has_key?("network")
+        if net.key?("network")
           network = net["network"] ? "public_network" : "private_network"
         else
           network = "private_network"
@@ -24,7 +24,7 @@ class Skeleton
 
         config.vm.network network,
           ip: net["ip"] ||= nil,
-#          netmask: net["netmask"] ||= nil,
+          #netmask: net["netmask"] ||= nil,
           type: net["type"] ||= nil
       end
     end
@@ -32,7 +32,7 @@ class Skeleton
     # Configure A Few VMWare Desktop Settings
     config.vm.provider :vmware_desktop do |v|
       #v.name = 'vagrant'
-      if settings.has_key?("gui")
+      if settings.key?("gui")
         v.gui = settings["gui"]
       end
       v.vmx["memsize"] = settings["memory"] ||= "2048"
@@ -42,7 +42,7 @@ class Skeleton
     # Configure A Few VirtualBox Settings
     config.vm.provider "virtualbox" do |vb|
       vb.name = 'vagrant'
-      if settings.has_key?("gui")
+      if settings.key?("gui")
         vb.gui = settings["gui"]
       end
       vb.customize [
@@ -56,7 +56,7 @@ class Skeleton
 
     # Configure Port Forwarding To The Box
     # Add Custom Ports From Configuration
-    if settings.has_key?("ports")
+    if settings.key?("ports")
       settings["ports"].each do |port|
         config.vm.network "forwarded_port",
           guest: port["guest"],
@@ -68,7 +68,9 @@ class Skeleton
     # Register All Of The Configured Shared Folders
     if settings['folders'].kind_of?(Array)
       settings["folders"].each do |folder|
-        config.vm.synced_folder folder["map"], folder["to"], type: folder["type"] ||= nil
+        config.vm.synced_folder folder["map"],
+          folder["to"],
+          type: folder["type"] ||= nil
       end
     end
 
@@ -76,7 +78,7 @@ class Skeleton
       source: "./vagrant/stubs/vagrant-cli.ini",
       destination: "/home/vagrant/stubs/vagrant-cli.ini"
 
-    if settings.has_key?("php") && settings['sites'].kind_of?(Array)
+    if settings.key?("php") && settings['sites'].kind_of?(Array)
       settings["sites"].each do |site|
         phpVersion = site["php"] ||= "8.1"
         unless settings["php"].include?(phpVersion)
@@ -85,7 +87,16 @@ class Skeleton
       end
     end
 
-    if settings.has_key?("php")
+    if settings.key?("dotnet") && settings['dotnet'].kind_of?(Array)
+      settings["sites"].each do |site|
+        phpVersion = site["dotnet"] ||= "8.1"
+        unless settings["dotnet"].include?(phpVersion)
+          settings["dotnet"].push(phpVersion)
+        end
+      end
+    end
+
+    if settings.key?("php")
       settings["php"].each do |php|
         config.vm.provision "file",
           source: "./vagrant/stubs/php#{php}",
@@ -97,32 +108,62 @@ class Skeleton
         destination: "/home/vagrant/"
     end
 
+    unless settings.key?("path")
+      settings["path"] = Hash.new
+    end
+
+    unless settings.key?("mailtrap")
+      settings["mailtrap"] = Hash.new
+    end
+
+    unless settings.key?("ssl")
+      settings["ssl"] = Hash.new
+    end
+
+    configFile="/root/vagrant_conf.sh"
     config.vm.provision "shell",
       privileged: true,
-      args: [hostIP, settings["timezone"] ||= "Etc/UTC"],
+      inline: <<-CONFIG
+touch #{configFile}
+echo 'export DEBIAN_FRONTEND="noninteractive"' >> #{configFile}
+echo 'export HOSTIP="#{hostIP}"' >> #{configFile}
+echo 'export TIMEZONE="#{settings["timezone"] ||= "Etc/UTC"}"' >> #{configFile}
+echo 'export HTTPD="#{settings["httpd"] ||= "apache2"}"' >> #{configFile}
+echo 'export NGROK="#{settings["ngrok"] ||= ""}"' >> #{configFile}
+echo 'export DOTNET="#{settings["dotnet"] ||= ""}"' >> #{configFile}
+echo 'export MAILTRAP_USERNAME="#{settings["mailtrap"]["username"] ||= ""}"' >> #{configFile}
+echo 'export MAILTRAP_PASSWORD="#{settings["mailtrap"]["password"] ||= ""}"' >> #{configFile}
+echo 'export SITE_PATH="#{settings["path"]["site"] ||= "/vagrant/sites"}"' >> #{configFile}
+echo 'export LOGS_PATH="#{settings["path"]["logs"] ||= "/vagrant/logs"}"' >> #{configFile}
+echo 'export SSL_PATH="#{settings["ssl"]["path"] ||= "/vagrant/ssl"}"' >> #{configFile}
+echo 'export SSL_HOST="#{settings["ssl"]["name"] ||= "vagrant"}"' >> #{configFile}
+echo 'export SSL_DAYS="#{settings["ssl"]["days"] ||= "3650"}"' >> #{configFile}
+CONFIG
+
+    config.vm.provision "shell",
+      privileged: true,
       path: "./vagrant/install.sh"
 
-    configFiles = [ "apache", "redis", "db", "php", "nvm" ]
+    configFiles = [ "apache2", "nginx", "redis", "mariadb", "php", "nvm", "emscripten", "postfix" ]
     configFiles.each do |app|
       config.vm.provision "shell",
         privileged: true,
-        args: [hostIP],
         path: "./vagrant/configure-" + app + ".sh"
     end
 
-   # Configure Mailtrap.io for Postfix
-    if settings.has_key?("mailtrap") && settings["mailtrap"].has_key?("username") && settings["mailtrap"].has_key?("password")
-      config.vm.provision "shell",
-        privileged: true,
-        args: [settings["mailtrap"]["username"], settings["mailtrap"]["password"]],
-        path: "./vagrant/configure-postfix.sh"
-    end
+    # Configure Mailtrap.io for Postfix
+    #if settings.key?("mailtrap") && settings["mailtrap"].key?("username") && settings["mailtrap"].key?("password")
+    #  config.vm.provision "shell",
+    #    privileged: true,
+    #    args: [settings["mailtrap"]["username"], settings["mailtrap"]["password"]],
+    #    path: "./vagrant/configure-postfix.sh"
+    #end
 
-    # Add Configured Apache Sites
+    # Add Configured Sites
     if settings['sites'].kind_of?(Array)
       config.vm.provision "shell",
         privileged: true,
-        path: "./vagrant/clear-apache-sites.sh"
+        path: "./vagrant/clear-sites.sh"
 
       settings["sites"].each do |site|
         ssl = site["ssl"] || false
@@ -144,16 +185,17 @@ class Skeleton
     config.vm.provision "shell",
       privileged: true,
       inline: <<-SH
-services="apache2";
+services="#{settings["httpd"] ||= "apache2"}";
 for f in /etc/php/*; do
   if [ ! -d "${f}" ]; then
     continue;
   fi;
   dir=${f##*/}
-  services="$services php$dir-fpm";
+  services+=" php$dir-fpm";
 done;
-echo "RESTARTING: $servcies"
-systemctl restart $services
+echo "RESTARTING: $services"
+systemctl enable "#{settings["httpd"] ||= "apache2"}.service";
+systemctl restart $services;
 SH
 
     if Vagrant.has_plugin? 'vagrant-hostsupdater'

@@ -1,6 +1,11 @@
 #!/bin/bash
 
-HOSTIP=$1
+if [ ! -f "/root/vagrant_conf.sh" ]; then
+  echo "Missing config file!" >&2
+  return 1;
+fi;
+
+source /root/vagrant_conf.sh
 
 echo "CONFIGURING redis"
 

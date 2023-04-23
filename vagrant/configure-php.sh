@@ -1,11 +1,17 @@
 #!/bin/bash
 
-HOSTIP=$1
-TIMEZONE=$(timedatectl | grep "Time zone" | awk {' print $3 '})
+if [ ! -f "/root/vagrant_conf.sh" ]; then
+  echo "Missing config file!" >&2
+  return 1;
+fi;
+
+source /root/vagrant_conf.sh
+
+#TIMEZONE=$(timedatectl | grep "Time zone" | awk {' print $3 '})
 
 echo "CONFIGURING PHP"
 
-for f in /home/vagrant/stubs/*; do
+for f in /home/vagrant/stubs/php*; do
   if [ ! -d "${f}" ]; then
     continue;
   fi;
@@ -14,13 +20,19 @@ for f in /home/vagrant/stubs/*; do
   ver=$(echo ${dir} | cut -c4-)
   cp "/home/vagrant/stubs/${dir}/vagrant.ini" "/etc/php/${ver}/mods-available/vagrant.ini"
   sed -i "s/^pm = .*/pm = ondemand/" "/etc/php/${ver}/fpm/pool.d/www.conf"
-  sed -i "s/^xdebug\.remote_host.*/xdebug\.remote_host=$HOSTIP/; s/^xdebug\.client_host.*/xdebug\.client_host=$HOSTIP/; s#^date\.timezone.*#date\.timezone=$TIMEZONE#" \
-    "/etc/php/${ver}/mods-available/vagrant.ini"
+  sed -i -e "s#^xdebug\.remote_host.*#xdebug\.remote_host=${HOSTIP}#;" \
+         -e "s#^xdebug\.client_host.*#xdebug\.client_host=${HOSTIP}#;" \
+         -e "s#^xdebug\.remote_log.*#xdebug\.remote_log=${LOGS_PATH}#;" \
+         -e "s#^xdebug\.output_dir.*#xdebug\.output_dir=${LOGS_PATH}#;" \
+         -e "s#^xdebug\.profiler_output_dir.*#xdebug\.profiler_output_dir=${LOGS_PATH}#;" \
+         -e "s#^date\.timezone.*#date\.timezone=${TIMEZONE}#" \
+            "/etc/php/${ver}/mods-available/vagrant.ini"
 
   cp "/home/vagrant/stubs/vagrant-cli.ini" "/etc/php/${ver}/mods-available/"
 done
 
-cat << EOF > /etc/php/common.conf
+#if [ ! -f "/etc/php/common.conf" ]; then
+  cat << 'EOF' > "/etc/php/common.conf"
 user = vagrant
 group = vagrant
 
@@ -48,6 +60,7 @@ php_flag[display_errors] = on
 
 clear_env = no
 EOF
+#fi
 
 phpenmod vagrant
 phpenmod -s cli vagrant-cli

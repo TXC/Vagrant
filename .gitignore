@@ -15,6 +15,7 @@ atlassian*
 .vagrant/
 ssl/
 logs/
+sites/
 Vagrant.yml
 
 # Log files (if you are creating logs in debug mode, uncomment this)
