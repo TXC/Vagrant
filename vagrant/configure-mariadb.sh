@@ -11,46 +11,40 @@ systemctl stop mysqld.service
 
 echo "CONFIGURING MariaDB"
 
-# sql_mode               = 'NO_UNSIGNED_SUBTRACTION,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'
+CONFDIR="/etc/mysql/mariadb.conf.d"
+MYCNF="/home/vagrant/.my.cnf"
 
-cat <<'CONF' > /etc/mysql/mariadb.conf.d/55-vagrant.cnf
-[mysqld]
-bind-address            = 0.0.0.0
+if [ -f "${CONFDIR}/55-vagrant.cnf" ]; then
+  cp "${STUBROOT}/mysql/vagrant.cnf" \
+    "${CONFDIR}/55-vagrant.cnf"
+fi
 
-sql_mode                = 'NO_UNSIGNED_SUBTRACTION,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_CREATE_USER,NO_ENGINE_SUBSTITUTION'
-
-max_allowed_packet      = 16M
-thread_stack            = 192K
-thread_cache_size       = 8
-
-innodb_buffer_pool_size = 1024M
-key_buffer_size         = 256M
-query_cache_limit       = 2M
-query_cache_size        = 128M
-query_cache_type        = 1  # Just means ON
-
-log_error = /var/log/mysql/error.log
-CONF
+LOGS_FILE=$(awk -F "=" '/log_error/ {print $2}' "${CONFDIR}/55-vagrant.cnf" |tr -d ' ')
+LOGS_PATH=$(dirname "${LOGS_FILE}")
+mkdir -p "${LOGS_PATH}"
 
 systemctl start mysqld.service
 
-sql="SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user='vagrant');"
-RESULT_VARIABLE="$(sudo mysql -sse "${sql}")";
-echo "RESULT_VARIABLE: ${RESULT_VARIABLE}"
-if [ "$RESULT_VARIABLE" -eq "0" ]; then
-  sql="CREATE USER 'vagrant'@'%' IDENTIFIED BY 'vagrant'; "
-  #sql+="CREATE USER 'vagrant'@'localhost' IDENTIFIED WITH unix_socket; "
-  sql+="flush privileges;"
-  sudo mysql -u root -e "${sql}"
-fi;
+echo "CHECKING USER SETTINGS IN MariaDB"
 
-MYCNF="/home/vagrant/.my.cnf"
 if [ ! -f "${MYCNF}" ]; then
-  cat <<'MYCNF' > "${MYCNF}"
-[client]
-user=vagrant
-password=vagrant
-MYCNF
+  cp "${STUBROOT}/mysql/my.cnf" \
+    "${MYCNF}"
+
   chown vagrant: "${MYCNF}"
   chmod 600 "${MYCNF}"
+fi;
+
+MU=$(awk -F "=" '/user/ {print $2}' "${MYCNF}" |tr -d ' ')
+MP=$(awk -F "=" '/password/ {print $2}' "${MYCNF}" |tr -d ' ')
+
+echo "SETTING UP '${MU}' USER IN MariaDB"
+
+sql="SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user='${MU}');"
+RESULT_VARIABLE="$(sudo mysql -sse "${sql}")";
+if [ "$RESULT_VARIABLE" -eq "0" ]; then
+  sql="CREATE USER '${MU}'@'%' IDENTIFIED BY '${MP}'; "
+  #sql+="CREATE USER '${MU}'@'localhost' IDENTIFIED WITH unix_socket; "
+  sql+="flush privileges;"
+  sudo mysql -u root -e "${sql}"
 fi;

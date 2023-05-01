@@ -51,45 +51,29 @@ create_apache_site () {
     return 0
   fi;
 
-  read -r -d '' VHOST <<'VHOST'
-<VirtualHost *:${HTTP_PORT}>
-  UseCanonicalName Off
-  ServerName ${ARG_HOST}:${HTTP_PORT}
-  DocumentRoot ${ARG_DOCROOT}
-  ${ADDITIONAL}
-  Include includes/*.conf
-</VirtualHost>
-VHOST
+  tmpfile=$(mktemp /tmp/apache2.XXXXXX)
 
-  export ADDITIONAL=""
+  cat "${STUBROOT}/apache2/vhosts/vhost-start.conf" >> $tmpfile
+
   if [ ! -z "$ARG_PHPVERSION" ]; then
-    ADDITIONAL+="
-  Define PHPSOCKET ${COMMONKEY}
-  Define PHPVERSION ${ARG_PHPVERSION}
-  Define PHPBASEDIR ${PHP_BASEDIR}"
+    cat "${STUBROOT}/apache2/vhosts/vhost-php.conf" >> $tmpfile
   fi;
 
   if [ ! -z "$ARG_404" ] && [ -f "$ARG_DOCROOT/$ARG_404" ]; then
-    ADDITIONAL+="
-  ErrorDocument 404 /${ARG_404}"
+    cat "${STUBROOT}/apache2/vhosts/vhost-404.conf" >> $tmpfile
   fi
 
   if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "80" ]]; then
-    ADDITIONAL+="
-  Redirect permanent / https://${ARG_HOST}/"
+    cat "${STUBROOT}/apache2/vhosts/vhost-non-ssl.conf" >> $tmpfile
   fi
 
   if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "443" ]]; then
-    ADDITIONAL+="
-  <IfModule ssl_module>
-    SSLEngine on
-    SSLVerifyClient none
-    SSLCertificateFile ${SSL_PATH}/${ARG_HOST}.crt
-    SSLCertificateKeyFile ${SSL_PATH}/${ARG_HOST}.key
-  </IfModule>"
+    cat "${STUBROOT}/apache2/vhosts/vhost-ssl.conf" >> $tmpfile
   fi;
+  cat "${STUBROOT}/apache2/vhosts/vhost-start.conf" >> $tmpfile
 
-  echo "$VHOST" | envsubst > $CFG
+  cat $tmpfile | envsubst > $CFG
+  rm $tmpfile
   touch "${LOGS_PATH}/apache2/${COMMONKEY}_access.log" \
         "${LOGS_PATH}/apache2/${COMMONKEY}_error.log"
 }
@@ -107,84 +91,51 @@ create_nginx_site () {
     return 0
   fi;
 
-  read -r -d '' VHOST <<'VHOST'
-server {
-  listen ${HTTP_PORT};
-  listen [::]:${HTTP_PORT};
-  server_name ${ARG_HOST};
-  root ${ARG_DOCROOT};
-  access_log ${LOGS_PATH}/nginx/${COMMONKEY}_access.log vhost;
-  error_log ${LOGS_PATH}/nginx/${COMMONKEY}_error.log error;
-  ${ADDITIONAL}
-  include includes/*.conf;
-}
-VHOST
+  tmpfile=$(mktemp /tmp/nginx.XXXXXX)
 
-  export ADDITIONAL=""
+  cat "${STUBROOT}/nginx/vhosts/vhost-start.conf" >> $tmpfile
+
   if [ ! -z "$ARG_PHPVERSION" ]; then
-    ADDITIONAL+="
-  location / {
-    index index.php;
-    try_files \${uri} /index.php\${is_args}\${args};
-  }
-
-  location ~ \.php$ {
-    fastcgi_split_path_info ^(.+?\.php)(/.*)$;
-    try_files \${fastcgi_script_name} =404;
-    set \${path_info} \${fastcgi_path_info};
-    #fastcgi_param PATH_INFO \${path_info};
-
-    #fastcgi_pass ${PHPSOCKET};
-    fastcgi_index index.php;
-    fastcgi_pass unix:/var/run/php/${COMMONKEY}-${ARG_PHPVERSION}.sock;
-    include fastcgi.conf;
-    fastcgi_param SCRIPT_FILENAME \${realpath_root}\${fastcgi_script_name};
-    fastcgi_param PATH_INFO \${fastcgi_path_info};
-  }"
+    cat "${STUBROOT}/nginx/vhosts/vhost-php.conf" >> $tmpfile
   fi;
 
   if [ ! -z "$ARG_404" ] && [ -f "$ARG_DOCROOT/$ARG_404" ]; then
-    $ADDITIONAL+="
-  error_page 404 /${ARG_404};"
+    cat "${STUBROOT}/nginx/vhosts/vhost-404.conf" >> $tmpfile
   fi
 
   if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "80" ]]; then
-    ADDITIONAL+="
-  return 301 https://${ARG_HOST}/\$request_uri;"
+    cat "${STUBROOT}/nginx/vhosts/vhost-non-ssl.conf" >> $tmpfile
   fi
 
   if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "443" ]]; then
-    ADDITIONAL+="
-  ssl_certificate     ${SSL_PATH}/${ARG_HOST}.crt;
-  ssl_certificate_key ${SSL_PATH}/${ARG_HOST}.key;
-  ssl_verify_client   off;"
+    cat "${STUBROOT}/nginx/vhosts/vhost-ssl.conf" >> $tmpfile
     HTTP_PORT+=' ssl http2'
   fi;
+  cat "${STUBROOT}/nginx/vhosts/vhost-start.conf" >> $tmpfile
 
-  echo "$VHOST" | envsubst '$COMMONKEY $HTTP_PORT $LOGS_PATH $ARG_HOST $ARG_DOCROOT $ARG_PHPVERSION $ARG_404 $ADDITIONAL' > $CFG
+  cat $tmpfile | envsubst \
+  '$COMMONKEY $HTTP_PORT $LOGS_PATH $ARG_HOST $ARG_DOCROOT $ARG_PHPVERSION $ARG_404 $ADDITIONAL' \
+  > $CFG
+
+  rm $tmpfile
   touch "${LOGS_PATH}/nginx/${COMMONKEY}_access.log" \
         "${LOGS_PATH}/nginx/${COMMONKEY}_error.log"
 }
 
 create_phpfpm () {
-  read -r -d '' CONF <<'CONF'
-[${COMMONKEY}]
-listen = /run/php/${COMMONKEY}-${VERSION}.sock
-php_admin_value[open_basedir] = "${PHP_BASEDIR}:/tmp"
-php_admin_value[error_log] = ${LOGS_PATH}/php${VERSION}/php-fpm.$pool.error.log
-php_admin_flag[log_errors] = on
+  CONF=$(cat "${STUBROOT}/vagrant-fpm-pool.conf")
 
-include = "/etc/php/common.conf"
-CONF
-
-  for f in /home/vagrant/stubs/*; do
+  for f in ${STUBROOT}/*; do
     if [ ! -d "${f}" ]; then
       continue;
     fi;
     dir=${f##*/}
     export VERSION=$(echo ${dir} | cut -c4-)
 
-    CFG="/etc/php/$VERSION/fpm/pool.d/$COMMONKEY.conf"
+    poolroot="/etc/php/${VERSION}/fpm/pool.d"
+    modroot="/etc/php/${VERSION}/mods-available"
+
+    CFG="${poolroot}/$COMMONKEY.conf"
     #CFG="${SITE_PATH}/php/${COMMONKEY}.conf";
     if [ ! -f "${CFG}" ]; then
       echo "$CONF" | envsubst '$COMMONKEY $LOGS_PATH $PHP_BASEDIR $VERSION' > $CFG

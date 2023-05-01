@@ -6,6 +6,16 @@ class Skeleton
     config.vm.hostname = settings["hostname"] ||= "vagrant.local"
     domains = []
     hostIP = ""
+    stubDirectory = "vagrant/stubs"
+    stubFiles = [
+      "php/vagrant-common.ini",
+      "php/vagrant-cli.ini.ini",
+      "php/vagrant-fpm-pool.conf",
+      "apache2/",
+      "mysql/",
+      "openssl/",
+      "nginx/",
+    ]
 
     if settings.key?("networking")
       if hostIP.empty?
@@ -74,9 +84,11 @@ class Skeleton
       end
     end
 
-    config.vm.provision "file",
-      source: "./vagrant/stubs/vagrant-cli.ini",
-      destination: "/home/vagrant/stubs/vagrant-cli.ini"
+    stubFiles.each do |file|
+      config.vm.provision "file",
+        source: "./#{stubDirectory}/#{file}",
+        destination: "/home/#{stubDirectory}/#{file}"
+    end
 
     if settings.key?("php") && settings['sites'].kind_of?(Array)
       settings["sites"].each do |site|
@@ -125,19 +137,37 @@ class Skeleton
       privileged: true,
       inline: <<-CONFIG
 touch #{configFile}
-echo 'export DEBIAN_FRONTEND="noninteractive"' >> #{configFile}
-echo 'export HOSTIP="#{hostIP}"' >> #{configFile}
-echo 'export TIMEZONE="#{settings["timezone"] ||= "Etc/UTC"}"' >> #{configFile}
-echo 'export HTTPD="#{settings["httpd"] ||= "apache2"}"' >> #{configFile}
-echo 'export NGROK="#{settings["ngrok"] ||= ""}"' >> #{configFile}
-echo 'export DOTNET="#{settings["dotnet"] ||= ""}"' >> #{configFile}
-echo 'export MAILTRAP_USERNAME="#{settings["mailtrap"]["username"] ||= ""}"' >> #{configFile}
-echo 'export MAILTRAP_PASSWORD="#{settings["mailtrap"]["password"] ||= ""}"' >> #{configFile}
-echo 'export SITE_PATH="#{settings["path"]["site"] ||= "/vagrant/sites"}"' >> #{configFile}
-echo 'export LOGS_PATH="#{settings["path"]["logs"] ||= "/vagrant/logs"}"' >> #{configFile}
-echo 'export SSL_PATH="#{settings["ssl"]["path"] ||= "/vagrant/ssl"}"' >> #{configFile}
-echo 'export SSL_HOST="#{settings["ssl"]["name"] ||= "vagrant"}"' >> #{configFile}
-echo 'export SSL_DAYS="#{settings["ssl"]["days"] ||= "3650"}"' >> #{configFile}
+cat <<'CONF' > #{configFile}
+export STUBROOT="/home/#{stubDirectory}"
+export DEBIAN_FRONTEND="noninteractive"
+export HOSTIP="#{hostIP}"
+export TIMEZONE="#{settings["timezone"] ||= "Etc/UTC"}"
+export HTTPD="#{settings["httpd"] ||= "apache2"}"
+export NGROK="#{settings["ngrok"] ||= ""}"
+export DOTNET="#{settings["dotnet"] ||= ""}"
+export MAILTRAP_USERNAME="#{settings["mailtrap"]["username"] ||= ""}"
+export MAILTRAP_PASSWORD="#{settings["mailtrap"]["password"] ||= ""}"
+export SITE_PATH="#{settings["path"]["site"] ||= "/vagrant/sites"}"
+export LOGS_PATH="#{settings["path"]["logs"] ||= "/vagrant/logs"}"
+export SSL_PATH="#{settings["ssl"]["path"] ||= "/vagrant/ssl"}"
+export SSL_HOST="#{settings["ssl"]["name"] ||= "vagrant"}"
+export SSL_DAYS="#{settings["ssl"]["days"] ||= "3650"}"
+CONF
+
+#echo 'export STUBROOT="/home/vagrant/stubs"' >> #{configFile}
+#echo 'export DEBIAN_FRONTEND="noninteractive"' >> #{configFile}
+#echo 'export HOSTIP="#{hostIP}"' >> #{configFile}
+#echo 'export TIMEZONE="#{settings["timezone"] ||= "Etc/UTC"}"' >> #{configFile}
+#echo 'export HTTPD="#{settings["httpd"] ||= "apache2"}"' >> #{configFile}
+#echo 'export NGROK="#{settings["ngrok"] ||= ""}"' >> #{configFile}
+#echo 'export DOTNET="#{settings["dotnet"] ||= ""}"' >> #{configFile}
+#echo 'export MAILTRAP_USERNAME="#{settings["mailtrap"]["username"] ||= ""}"' >> #{configFile}
+#echo 'export MAILTRAP_PASSWORD="#{settings["mailtrap"]["password"] ||= ""}"' >> #{configFile}
+#echo 'export SITE_PATH="#{settings["path"]["site"] ||= "/vagrant/sites"}"' >> #{configFile}
+#echo 'export LOGS_PATH="#{settings["path"]["logs"] ||= "/vagrant/logs"}"' >> #{configFile}
+#echo 'export SSL_PATH="#{settings["ssl"]["path"] ||= "/vagrant/ssl"}"' >> #{configFile}
+#echo 'export SSL_HOST="#{settings["ssl"]["name"] ||= "vagrant"}"' >> #{configFile}
+#echo 'export SSL_DAYS="#{settings["ssl"]["days"] ||= "3650"}"' >> #{configFile}
 CONFIG
 
     config.vm.provision "shell",

@@ -1,0 +1,10 @@
+${BASE}
+
+[ req_distinguished_name ]
+O  = Vagrant
+C  = UN
+CN = ${ARG_HOST}
+
+[ alternate_names ]
+DNS.1 = ${ARG_HOST}
+DNS.2 = *.${ARG_HOST}

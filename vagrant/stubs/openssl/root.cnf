@@ -1,0 +1,5 @@
+${BASE}
+[ req_distinguished_name ]
+O  = Vagrant
+C  = UN
+CN = ${SSL_HOST} Root CA

@@ -20,85 +20,39 @@ sed -i -e "s/^user .*;/user vagrant;/" \
        -e "s#^error_log .*;#error_log ${LOGS_PATH}/nginx/error\.log#" \
        /etc/nginx/nginx.conf
 
-if [ ! -f "/etc/nginx/conf.d/modules.conf" ]; then
-  cat << 'MODULES' > "/etc/nginx/conf.d/modules.conf"
-etag off;
+CONFDIR="/etc/nginx/conf.d"
+INCLDIR="/etc/nginx/includes"
 
-add_header Strict-Transport-Security "max-age=63072000; includeSubDomains";
+if [ ! -f "${CONFDIR}/modules.conf" ]; then
+  cp "${STUBROOT}/nginx/cond.d/modules.conf" \
+     "${CONFDIR}/modules.conf"
+fi;
 
-map $sent_http_content_type $expires {
-  default         30s;
-  ~text/          1M;
-  ~image/         1M;
-  ~application/   1M;
-  ~font/          1M;
-}
-MODULES
-fi
+if [ ! -f "${CONFDIR}/ssl.conf" ]; then
+  cp "${STUBROOT}/nginx/cond.d/ssl.conf" \
+     "${CONFDIR}/ssl.conf"
+fi;
 
-if [ ! -f "/etc/nginx/conf.d/ssl.conf" ]; then
-  cat << 'SSL' > "/etc/nginx/conf.d/ssl.conf"
-ssl_session_cache   shared:SSL:10m;
-ssl_session_timeout 10m;
-ssl_ciphers         HIGH:!MEDIUM:!aNULL:!MD5:!RC4;
-SSL
-fi
+if [ ! -f "${CONFDIR}/logging.conf" ]; then
+  cp "${STUBROOT}/nginx/cond.d/logging.conf" \
+     "${CONFDIR}/logging.conf"
+fi;
 
-if [ ! -f "/etc/nginx/conf.d/logging.conf" ]; then
-  cat << 'LOGGING' > "/etc/nginx/conf.d/logging.conf"
-log_format  vhost  '$host:$server_port $remote_addr - $remote_user '
-                    '[$time_local] "$request" $status $body_bytes_sent '
-                    '"$http_referer" "$http_user_agent" '
-                    '"$http_x_forwarded_for" "$gzip_ratio"';
+if [ ! -f "${INCLDIR}/common.conf" ]; then
+  cat "${STUBROOT}/nginx/includes/common.conf" | \
+     envsubst '$LOGS_PATH' > \
+     "${INCLDIR}/common.conf"
+fi;
 
-log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
-                    '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
-                    '"$http_x_forwarded_for" "$gzip_ratio"';
+if [ ! -f "${INCLDIR}/headers.conf" ]; then
+  cp "${STUBROOT}/nginx/includes/headers.conf" \
+     "${INCLDIR}/headers.conf"
+fi;
 
-log_format  common  '$remote_addr - $remote_user '
-                    '[$time_local] "$request" $status $body_bytes_sent'
-                    '"$http_x_forwarded_for" "$gzip_ratio"';
-LOGGING
-fi
-
-if [ ! -f "/etc/nginx/includes/common.conf" ]; then
-  cat << 'HEADERS' | envsubst '$LOGS_PATH' > "/etc/nginx/includes/common.conf"
-index index.html;
-port_in_redirect off;
-
-#access_log ${LOGS_PATH}/nginx/${server_name}_access.log vhost;
-#error_log ${LOGS_PATH}/nginx/${server_name}_error.log error;
-HEADERS
-fi
-
-if [ ! -f "/etc/nginx/includes/headers.conf" ]; then
-  cat << 'HEADERS' > "/etc/nginx/includes/headers.conf"
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-add_header X-Frame-Options "DENY" always;
-add_header X-Content-Type-Options nosniff always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header Referrer-Policy "origin" always;
-HEADERS
-fi
-
-if [ ! -f "/etc/nginx/includes/deflate.conf" ]; then
-  cat << 'DEFLATE' > "/etc/nginx/includes/deflate.conf"
-location ~\.(log)$ {
-  deny all;
-  return 403;
-}
-location ~ \.css\.gz$ {
-  add_header Content-Encoding gzip;
-  add_header Vary Accept-Encoding;
-  add_header Content-Type text/css;
-}
-location ~ \.js\.gz$ {
-  add_header Content-Encoding gzip;
-  add_header Vary Accept-Encoding;
-  add_header Content-Type text/javascript;
-}
-DEFLATE
-fi
+if [ ! -f "${INCLDIR}/deflate.conf" ]; then
+  cp "${STUBROOT}/nginx/includes/deflate.conf" \
+     "${INCLDIR}/deflate.conf"
+fi;
 
 echo "DONE"
 

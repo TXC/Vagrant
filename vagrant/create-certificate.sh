@@ -49,58 +49,7 @@ export PATH_KEY="${SSL_PATH}/$ARG_HOST.key"
 
 if [ ! -f $PATH_BASE_CNF ]; then
   echo "Generate Base Certificate Config"
-  cat << 'BASE' | envsubst > "${PATH_BASE_CNF}"
-[ ca ]
-default_ca              = ca_${SSL_HOST}
-
-[ ca_${SSL_HOST} ]
-dir                     = ${SSL_PATH}/
-certs                   = ${SSL_PATH}/
-new_certs_dir           = ${SSL_PATH}/
-
-private_key             = ${PATH_ROOT_KEY}
-certificate             = ${PATH_ROOT_CRT}
-
-default_md              = sha256
-
-name_opt                = ca_default
-cert_opt                = ca_default
-default_days            = ${SSL_DAYS}
-preserve                = no
-policy                  = policy_loose
-
-[ policy_loose ]
-countryName             = optional
-stateOrProvinceName     = optional
-localityName            = optional
-organizationName        = optional
-organizationalUnitName  = optional
-commonName              = supplied
-emailAddress            = optional
-
-[ req ]
-prompt                  = no
-encrypt_key             = no
-default_bits            = 2048
-distinguished_name      = req_distinguished_name
-string_mask             = utf8only
-default_md              = sha256
-x509_extensions         = v3_ca
-
-[ v3_ca ]
-authorityKeyIdentifier  = keyid,issuer
-basicConstraints        = critical, CA:true, pathlen:0
-keyUsage                = critical, digitalSignature, keyCertSign
-subjectKeyIdentifier    = hash
-
-[ server_cert ]
-authorityKeyIdentifier  = keyid,issuer:always
-basicConstraints        = CA:FALSE
-extendedKeyUsage        = serverAuth
-keyUsage                = critical, digitalSignature, keyEncipherment
-subjectAltName          = @alternate_names
-subjectKeyIdentifier    = hash
-BASE
+  cat "${STUBROOT}/openssl/base.cnf" | envsubst > "${PATH_BASE_CNF}"
 fi
 export BASE=$(cat ${PATH_BASE_CNF})
 
@@ -108,13 +57,7 @@ export BASE=$(cat ${PATH_BASE_CNF})
 if [ ! -f $PATH_ROOT_CNF ] || [ ! -f $PATH_ROOT_KEY ] || [ ! -f $PATH_ROOT_CRT ]; then
   echo "Generating Root CA Certificate for ${SSL_HOST}"
   # Generate an OpenSSL configuration file specifically for this certificate.
-  cat << 'ROOT' | envsubst > "${PATH_ROOT_CNF}"
-${BASE}
-[ req_distinguished_name ]
-O  = Vagrant
-C  = UN
-CN = ${SSL_HOST} Root CA
-ROOT
+  cat "${STUBROOT}/openssl/root.cnf" | envsubst > "${PATH_ROOT_CNF}"
 
   # Finally, generate the private key and certificate.
   openssl genrsa -out "${PATH_ROOT_KEY}" 4096 2>/dev/null || echo "Unable to generate RSA for ${SSL_HOST}"
@@ -135,22 +78,14 @@ fi
 # Only generate a certificate if there isn't one already there.
 if [ ! -f $PATH_CNF ] || [ ! -f $PATH_KEY ] || [ ! -f $PATH_CRT ]; then
   echo "Generating Certificate for ${ARG_HOST}"
+
   # Uncomment the global 'copy_extentions' OpenSSL option to ensure the SANs are copied into the certificate.
-  sed -i '/^copy_extensions\ =\ copy/ s/./#&/' "/etc/ssl/openssl.cnf" || echo "Unable to modify OpenSSL config"
+  if grep -E "^copy_extensions" "/etc/ssl/openssl.cnf" ; then
+    sed -i '/^copy_extensions\ =\ copy/ s/./#&/' "/etc/ssl/openssl.cnf" || echo "Unable to modify OpenSSL config"
+  fi;
 
   # Generate an OpenSSL configuration file specifically for this certificate.
-  cat << 'CNF' | envsubst > "${PATH_CNF}"
-${BASE}
-
-[ req_distinguished_name ]
-O  = Vagrant
-C  = UN
-CN = ${ARG_HOST}
-
-[ alternate_names ]
-DNS.1 = ${ARG_HOST}
-DNS.2 = *.${ARG_HOST}
-CNF
+  cat "${STUBROOT}/openssl/cert.cnf" | envsubst > "${PATH_CNF}"
 
   # Finally, generate the private key and certificate signed with the $(SSL_HOST) Root CA.
   openssl genrsa -out "${PATH_KEY}" 2048 2>/dev/null || echo "Unable to generate RSA for ${ARG_HOST}"
