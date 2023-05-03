@@ -12,17 +12,11 @@ source /root/vagrant_conf.sh
 echo "CONFIGURING PHP"
 
 if [ ! -f "/etc/php/common.conf" ]; then
-  cp "${STUBROOT}/vagrant-common.ini" \
-     "/etc/php/common.ini"
+  cp "${STUBROOT}/php/vagrant-common.conf" \
+     "/etc/php/common.conf"
 fi
 
-for f in ${STUBROOT}/php*; do
-  if [ ! -d "${f}" ]; then
-    continue;
-  fi;
-
-  dir=${f##*/}
-  ver=$(echo ${dir} | cut -c4-)
+for ver in ${PHP_VERSIONS}; do
   poolroot="/etc/php/${ver}/fpm/pool.d"
   modroot="/etc/php/${ver}/mods-available"
 
@@ -32,7 +26,7 @@ for f in ${STUBROOT}/php*; do
   fi
 
   if [ ! -f "${modroot}/vagrant.ini" ]; then
-    cp "${STUBROOT}/${dir}/vagrant.ini" \
+    cp "${STUBROOT}/php/php${ver}/vagrant.ini" \
        "${modroot}/vagrant.ini"
 
     sed -i -e "s#^xdebug\.remote_host.*#xdebug\.remote_host=${HOSTIP}#;" \
@@ -44,8 +38,8 @@ for f in ${STUBROOT}/php*; do
            "${modroot}/vagrant.ini"
   fi
 
-  if [ ! -f "${modroot}/vagrant.ini" ]; then
-    cp "${STUBROOT}/vagrant-cli.ini" \
+  if [ ! -f "${modroot}/vagrant-cli.ini" ]; then
+    cp "${STUBROOT}/php/vagrant-cli.ini" \
        "${modroot}/"
   fi
 done

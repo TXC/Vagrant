@@ -19,6 +19,10 @@ if [ -z "$1" ] || [ -z "$2" ] || [ -z "$3" ] || [ -z "$4" ]; then
   return 1;
 fi;
 
+if [ -L /usr/local/sbin/create_site ]; then
+    ln -sf "/vagrant/vagrant/create-site.sh" "/usr/local/sbin/create_site";
+fi
+
 export COMMONKEY=$(echo $ARG_HOST |openssl dgst -sha384 |sed 's/^.* //'|cut -c1-8)
 export PHP_BASEDIR=$(findmnt -n --target $ARG_DOCROOT | head -n 1 | awk '{ print $1 }')
 
@@ -47,30 +51,24 @@ create_apache_site () {
     CFG="${SITE_PATH}/apache2/$COMMONKEY-ssl.conf";
   fi
 
-  if [ -f "${CFG}" ]; then
-    return 0
-  fi;
-
   tmpfile=$(mktemp /tmp/apache2.XXXXXX)
 
-  cat "${STUBROOT}/apache2/vhosts/vhost-start.conf" >> $tmpfile
+  cat "${STUBROOT}/apache2/vhost/vhost-start.conf" >> $tmpfile
 
   if [ ! -z "$ARG_PHPVERSION" ]; then
-    cat "${STUBROOT}/apache2/vhosts/vhost-php.conf" >> $tmpfile
+    cat "${STUBROOT}/apache2/vhost/vhost-php.conf" >> $tmpfile
   fi;
 
   if [ ! -z "$ARG_404" ] && [ -f "$ARG_DOCROOT/$ARG_404" ]; then
-    cat "${STUBROOT}/apache2/vhosts/vhost-404.conf" >> $tmpfile
+    cat "${STUBROOT}/apache2/vhost/vhost-404.conf" >> $tmpfile
   fi
 
   if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "80" ]]; then
-    cat "${STUBROOT}/apache2/vhosts/vhost-non-ssl.conf" >> $tmpfile
-  fi
-
-  if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "443" ]]; then
-    cat "${STUBROOT}/apache2/vhosts/vhost-ssl.conf" >> $tmpfile
+    cat "${STUBROOT}/apache2/vhost/vhost-non-ssl.conf" >> $tmpfile
+  elif [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "443" ]]; then
+    cat "${STUBROOT}/apache2/vhost/vhost-ssl.conf" >> $tmpfile
   fi;
-  cat "${STUBROOT}/apache2/vhosts/vhost-start.conf" >> $tmpfile
+  cat "${STUBROOT}/apache2/vhost/vhost-end.conf" >> $tmpfile
 
   cat $tmpfile | envsubst > $CFG
   rm $tmpfile
@@ -87,34 +85,28 @@ create_nginx_site () {
     CFG="${SITE_PATH}/nginx/${COMMONKEY}-ssl.conf";
   fi
 
-  if [ -f "${CFG}" ]; then
-    return 0
-  fi;
-
   tmpfile=$(mktemp /tmp/nginx.XXXXXX)
 
-  cat "${STUBROOT}/nginx/vhosts/vhost-start.conf" >> $tmpfile
+  cat "${STUBROOT}/nginx/vhost/vhost-start.conf" >> $tmpfile
 
   if [ ! -z "$ARG_PHPVERSION" ]; then
-    cat "${STUBROOT}/nginx/vhosts/vhost-php.conf" >> $tmpfile
+    cat "${STUBROOT}/nginx/vhost/vhost-php.conf" >> $tmpfile
   fi;
 
   if [ ! -z "$ARG_404" ] && [ -f "$ARG_DOCROOT/$ARG_404" ]; then
-    cat "${STUBROOT}/nginx/vhosts/vhost-404.conf" >> $tmpfile
+    cat "${STUBROOT}/nginx/vhost/vhost-404.conf" >> $tmpfile
   fi
 
   if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "80" ]]; then
-    cat "${STUBROOT}/nginx/vhosts/vhost-non-ssl.conf" >> $tmpfile
-  fi
-
-  if [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "443" ]]; then
-    cat "${STUBROOT}/nginx/vhosts/vhost-ssl.conf" >> $tmpfile
+    cat "${STUBROOT}/nginx/vhost/vhost-non-ssl.conf" >> $tmpfile
+  elif [[ "$ARG_SSL" == "1" ]] && [[ "$HTTP_PORT" == "443" ]]; then
+    cat "${STUBROOT}/nginx/vhost/vhost-ssl.conf" >> $tmpfile
     HTTP_PORT+=' ssl http2'
   fi;
-  cat "${STUBROOT}/nginx/vhosts/vhost-start.conf" >> $tmpfile
+  cat "${STUBROOT}/nginx/vhost/vhost-end.conf" >> $tmpfile
 
   cat $tmpfile | envsubst \
-  '$COMMONKEY $HTTP_PORT $LOGS_PATH $ARG_HOST $ARG_DOCROOT $ARG_PHPVERSION $ARG_404 $ADDITIONAL' \
+  '$COMMONKEY $HTTP_PORT $LOGS_PATH $ARG_HOST $ARG_DOCROOT $ARG_PHPVERSION $ARG_404 $SSL_PATH' \
   > $CFG
 
   rm $tmpfile
@@ -123,23 +115,18 @@ create_nginx_site () {
 }
 
 create_phpfpm () {
-  CONF=$(cat "${STUBROOT}/vagrant-fpm-pool.conf")
+  CONF=$(cat "${STUBROOT}/php/vagrant-fpm-pool.conf")
+  poolroot="${SITE_PATH}/php";
 
-  for f in ${STUBROOT}/*; do
-    if [ ! -d "${f}" ]; then
-      continue;
-    fi;
-    dir=${f##*/}
-    export VERSION=$(echo ${dir} | cut -c4-)
+  for VERSION in ${PHP_VERSIONS}; do
+    export VERSION
 
-    poolroot="/etc/php/${VERSION}/fpm/pool.d"
-    modroot="/etc/php/${VERSION}/mods-available"
+    #poolroot="/etc/php/${VERSION}/fpm/pool.d"
 
-    CFG="${poolroot}/$COMMONKEY.conf"
-    #CFG="${SITE_PATH}/php/${COMMONKEY}.conf";
-    if [ ! -f "${CFG}" ]; then
-      echo "$CONF" | envsubst '$COMMONKEY $LOGS_PATH $PHP_BASEDIR $VERSION' > $CFG
-    fi
+    CFG="${poolroot}/${COMMONKEY}-${VERSION}.conf"
+    echo "$CONF" | envsubst '$COMMONKEY $LOGS_PATH $PHP_BASEDIR $VERSION' > $CFG
+
+    ln -sf "${CFG}" "/etc/php/${VERSION}/fpm/pool.d/${COMMONKEY}.conf";
   done
 }
 

@@ -29,7 +29,7 @@ fi
 fi;
 
 pushd /opt/nvm
-git checkout `git describe --abbrev=0 --tags`
+git checkout `git describe --abbrev=0 --tags` > /dev/null 2>&1
 source /opt/nvm/nvm.sh
 popd
 

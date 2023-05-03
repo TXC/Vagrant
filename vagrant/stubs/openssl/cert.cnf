@@ -1,9 +1,23 @@
 ${BASE}
 
+# CN: CommonName
+# OU: OrganizationalUnit
+# O: Organization
+# L: Locality
+# S: StateOrProvinceName
+# C: CountryName
+
 [ req_distinguished_name ]
-O  = Vagrant
-C  = UN
-CN = ${ARG_HOST}
+#O  = Vagrant
+#C  = UN
+#CN = ${ARG_HOST}
+countryName = UN
+stateOrProvinceName = "U"
+localityName = "Internet"
+organizationName = Vagrant
+organizationalUnitName = Development
+commonName = ${ARG_HOST}
+emailAddress = ${ARG_HOST}@${SSL_HOST}.${SSL_DOMAIN}
 
 [ alternate_names ]
 DNS.1 = ${ARG_HOST}

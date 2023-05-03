@@ -24,17 +24,17 @@ CONFDIR="/etc/nginx/conf.d"
 INCLDIR="/etc/nginx/includes"
 
 if [ ! -f "${CONFDIR}/modules.conf" ]; then
-  cp "${STUBROOT}/nginx/cond.d/modules.conf" \
+  cp "${STUBROOT}/nginx/conf.d/modules.conf" \
      "${CONFDIR}/modules.conf"
 fi;
 
 if [ ! -f "${CONFDIR}/ssl.conf" ]; then
-  cp "${STUBROOT}/nginx/cond.d/ssl.conf" \
+  cp "${STUBROOT}/nginx/conf.d/ssl.conf" \
      "${CONFDIR}/ssl.conf"
 fi;
 
 if [ ! -f "${CONFDIR}/logging.conf" ]; then
-  cp "${STUBROOT}/nginx/cond.d/logging.conf" \
+  cp "${STUBROOT}/nginx/conf.d/logging.conf" \
      "${CONFDIR}/logging.conf"
 fi;
 

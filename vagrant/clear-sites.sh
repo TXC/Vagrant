@@ -7,8 +7,12 @@ fi;
 
 source /root/vagrant_conf.sh
 
+if [ -L /usr/local/sbin/clear_sites ]; then
+    ln -sf "/vagrant/vagrant/clear-sites.sh" "/usr/local/sbin/clear_sites";
+fi
+
 SRC_PATH="/etc/apache2/sites-enabled"
-if [ -d "/etc/apache2" ] && [ $(ls -l "${SRC_PATH}/*" | grep "\-ssl" | wc -l) -gt 0 ]; then
+if [ -d "${SRC_PATH}" ] && [ $(ls -l "${SRC_PATH}" | grep "\-ssl" | wc -l) -gt 0 ]; then
   APACHE_EXCLUDE_SSL=""
   APACHE_EXCLUDE_LOG=""
 
@@ -23,7 +27,7 @@ if [ -d "/etc/apache2" ] && [ $(ls -l "${SRC_PATH}/*" | grep "\-ssl" | wc -l) -g
 fi;
 
 SRC_PATH="/etc/nginx/sites-enabled"
-if [ -d "/etc/nginx" ] && [ $(ls -l "${SRC_PATH}" | grep "\-ssl"  | wc -l) -gt 0 ]; then
+if [ -d "${SRC_PATH}" ] && [ $(ls -l "${SRC_PATH}" | grep "\-ssl"  | wc -l) -gt 0 ]; then
 
   NGINX_EXCLUDE_SSL=""
   NGINX_EXCLUDE_LOG=""
@@ -41,5 +45,9 @@ if [ -d "/etc/nginx" ] && [ $(ls -l "${SRC_PATH}" | grep "\-ssl"  | wc -l) -gt 0
 fi;
 
 sudo find /etc/php/ -path "*/fpm/pool.d/*" -type f -not -name "www.conf" -print0 -delete
-sudo find ${LOGS_PATH}/ -type f -not -name "other_vhosts_access.log" -not -name "access.log" -not -name "error.log" ${EXCLUDE_LOG} -print0 -delete
-sudo find ${SSL_PATH}/ -type f -not -name "base.*" -not -name "ca.*" ${EXCLUDE_SSL} -print0 -delete
+if [ ! -z "${LOGS_PATH}" ]; then
+  sudo find ${LOGS_PATH}/ -type f -not -name "other_vhosts_access.log" -not -name "access.log" -not -name "error.log" ${EXCLUDE_LOG} -print0 -delete
+fi
+if [ ! -z "${SSL_PATH}" ]; then
+  sudo find ${SSL_PATH}/ -type f -not -name "base.*" -not -name "ca.*" ${EXCLUDE_SSL} -print0 -delete
+fi

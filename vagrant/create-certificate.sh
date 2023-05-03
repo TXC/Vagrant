@@ -17,20 +17,10 @@ fi;
 
 export ARG_HOST=$1
 export COMMONKEY=$(echo ARG_HOST |openssl dgst -sha384 |sed 's/^.* //'|cut -c1-8)
+export SSL_DOMAIN=$(hostname -d)
 
-if [ -z "${SSL_DAYS}" ]; then
-  # Certicate valid
-  export SSL_DAYS="3650"
-fi
-
-if [ -z "${SSL_PATH}" ]; then
-  # Certicate location
-  export SSL_PATH="/vagrant/ssl"
-fi
-
-if [ -z "${SSL_DAYS}" ]; then
-  # Root CA Certicate name
-  export SSL_HOST="$(hostname)"
+if [ -L /usr/local/sbin/create_cert ]; then
+    ln -sf "/vagrant/vagrant/create-certificate.sh" "/usr/local/sbin/create_cert";
 fi
 
 # Path to the custom BASE config.
@@ -60,7 +50,7 @@ if [ ! -f $PATH_ROOT_CNF ] || [ ! -f $PATH_ROOT_KEY ] || [ ! -f $PATH_ROOT_CRT ]
   cat "${STUBROOT}/openssl/root.cnf" | envsubst > "${PATH_ROOT_CNF}"
 
   # Finally, generate the private key and certificate.
-  openssl genrsa -out "${PATH_ROOT_KEY}" 4096 2>/dev/null || echo "Unable to generate RSA for ${SSL_HOST}"
+  openssl genrsa -out "${PATH_ROOT_KEY}" 4096
   openssl req -config "${PATH_ROOT_CNF}" \
     -key "${PATH_ROOT_KEY}" \
     -x509 \
@@ -68,11 +58,11 @@ if [ ! -f $PATH_ROOT_CNF ] || [ ! -f $PATH_ROOT_KEY ] || [ ! -f $PATH_ROOT_CRT ]
     -extensions v3_ca \
     -days ${SSL_DAYS} \
     -sha256 \
-    -out "${PATH_ROOT_CRT}" 2>/dev/null || echo "Unable to generate CSR for ${SSL_HOST}"
+    -out "${PATH_ROOT_CRT}"
 
   # Symlink ca to local certificate storage and run update command
-  ln -sf "${PATH_ROOT_CRT}" "/usr/local/share/ca-certificates/" || echo "Unable to link"
-  update-ca-certificates || echo "Unable to update"
+  ln -sf "${PATH_ROOT_CRT}" "/usr/local/share/ca-certificates/" || echo "Unable to link" 1>&2
+  update-ca-certificates || echo "Unable to update" 1>&2
 fi
 
 # Only generate a certificate if there isn't one already there.
@@ -81,18 +71,18 @@ if [ ! -f $PATH_CNF ] || [ ! -f $PATH_KEY ] || [ ! -f $PATH_CRT ]; then
 
   # Uncomment the global 'copy_extentions' OpenSSL option to ensure the SANs are copied into the certificate.
   if grep -E "^copy_extensions" "/etc/ssl/openssl.cnf" ; then
-    sed -i '/^copy_extensions\ =\ copy/ s/./#&/' "/etc/ssl/openssl.cnf" || echo "Unable to modify OpenSSL config"
+    sed -i '/^copy_extensions\ =\ copy/ s/./#&/' "/etc/ssl/openssl.cnf" || echo "Unable to modify OpenSSL config" 1>&2
   fi;
 
   # Generate an OpenSSL configuration file specifically for this certificate.
   cat "${STUBROOT}/openssl/cert.cnf" | envsubst > "${PATH_CNF}"
 
   # Finally, generate the private key and certificate signed with the $(SSL_HOST) Root CA.
-  openssl genrsa -out "${PATH_KEY}" 2048 2>/dev/null || echo "Unable to generate RSA for ${ARG_HOST}"
+  openssl genrsa -out "${PATH_KEY}" 2048
   openssl req -config "${PATH_CNF}" \
     -key "${PATH_KEY}" \
     -new -sha256 \
-    -out "${PATH_CSR}" 2>/dev/null || echo "Unable to generate CSR for ${ARG_HOST}"
+    -out "${PATH_CSR}"
   openssl x509 -req -extfile "${PATH_CNF}" \
     -extensions server_cert \
     -days ${SSL_DAYS} \
@@ -101,5 +91,5 @@ if [ ! -f $PATH_CNF ] || [ ! -f $PATH_KEY ] || [ ! -f $PATH_CRT ]; then
     -CA "${PATH_ROOT_CRT}" \
     -CAkey "${PATH_ROOT_KEY}" \
     -CAcreateserial \
-    -out "${PATH_CRT}" 2>/dev/null || echo "Unable to generate x509 for ${ARG_HOST}"
+    -out "${PATH_CRT}"
 fi

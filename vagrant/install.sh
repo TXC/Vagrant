@@ -42,7 +42,7 @@ add-apt-repository ppa:ondrej/nginx -yn
 debconf-set-selections <<< "mariadb-server-10.6 mariadb-server-10.6/postrm_remove_databases boolean false"
 
 PACKAGES="apache2 nginx sqlite3 redis memcached libmemcached-tools mariadb-server mariadb-client "
-PACKAGES+="mariadb-common gettext openssl "
+PACKAGES+="mariadb-common gettext openssl bzip2 "
 #PACKAGES+="python3 python3-pip build-essential make ant libidn12 cmake "
 
 if [ ! -z "${NGROK}" ]; then
@@ -65,7 +65,7 @@ if [ ! -z "${DOTNET}" ]; then
   PACKAGES+="dotnet-sdk-${DOTNET} "
 fi;
 
-for f in /home/vagrant/stubs/*/packages.txt; do
+for f in /home/vagrant/stubs/php/*/packages.txt; do
   PACKAGES+="$(sed 's/#.*//' ${f} | tr '\n' ' ') "
 done
 

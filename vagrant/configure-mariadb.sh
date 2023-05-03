@@ -14,7 +14,7 @@ echo "CONFIGURING MariaDB"
 CONFDIR="/etc/mysql/mariadb.conf.d"
 MYCNF="/home/vagrant/.my.cnf"
 
-if [ -f "${CONFDIR}/55-vagrant.cnf" ]; then
+if [ ! -f "${CONFDIR}/55-vagrant.cnf" ]; then
   cp "${STUBROOT}/mysql/vagrant.cnf" \
     "${CONFDIR}/55-vagrant.cnf"
 fi
