@@ -2,10 +2,16 @@
 hostname: "boxname.local"
 memory: 1024
 cpus: 2
-gui: "off"
+gui: false
 #natdnshostresolver: "off"
 #natdnsproxy: "off"
 timezone: "Etc/UTC"
+ip: autonetwork
+#ip: 192.168.123.4
+
+networking:
+  - ip: "192.168.123.10"
+    type: 'public_network'
 
 authorize:
   - ~/.ssh/id_ed25519.pub
@@ -16,34 +22,32 @@ keys:
   - ~/.ssh/id_rsa
 
 path:
-  path: /vagrant/sites
-  logs: /vagrant/logs
+  logs: /vagrant/var/log    # Defaults to /vagrant/var/log
+  path: /vagrant/var/sites  # Defaults to /vagrant/var/sites
+  ssl: /vagrant/var/ssl     # Defaults to /vagrant/var/ssl
 
-ssl:
-  name: vagrant       # Defaults to hostname
-  days: 3650          # Defaults to 3650
-  path: /vagrant/ssl  # Defaults to /vagrant/ssl
-
-mailtrap:
-  username: abcdefg1234567
-  password: 1234567abcdefg
-
-networking:
-  - public: false
-    ip: "192.168.123.4"
-  - public: true
-    type: "dhcp"
-
-folders:
-  - map: ../Projects/project1
-    to: /var/www/project1
-  - map: ../Projects/project2
-    to: /var/www/project2
-
-httpd: nginx
-#httpd: apache2
-
-dotnet: "7.0"
+features:
+  - apache2: false
+  - composer: true
+      version: "2"
+  #- dotnet:
+  #    version: "7.0"
+  - emscripten: false
+  - mailtrap:
+      hostname: sandbox.smtp.mailtrap.io
+      username: abcdefg1234567
+      password: 1234567abcdefg
+  - mariadb: true
+  - mysql: false
+  - nginx: true
+  - ngrok: true
+  - nvm:
+      version: 16           # Default is latest LTS
+  - openssl:
+      days: 3650            # Defaults to 3650
+  - ohmyzsh: false
+  - php: true
+  - webdriver: false
 
 php:
   - "5.6"
@@ -54,6 +58,12 @@ php:
   - "7.4"
 #  - "8.0"
 #  - "8.1"
+
+folders:
+  - map: ../Projects/project1
+    to: /var/www/project1
+  - map: ../Projects/project2
+    to: /var/www/project2
 
 sites:
   - hostname: project1.local

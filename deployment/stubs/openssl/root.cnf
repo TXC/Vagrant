@@ -1,0 +1,20 @@
+${BASE}
+
+# CN: CommonName
+# OU: OrganizationalUnit
+# O: Organization
+# L: Locality
+# S: StateOrProvinceName
+# C: CountryName
+
+[ req_distinguished_name ]
+#O  = Vagrant
+#C  = UN
+#CN = ${HOSTNAME} Root CA
+countryName = UN
+stateOrProvinceName = "U"
+localityName = "Internet"
+organizationName = Vagrant
+organizationalUnitName = Developers
+commonName = ${HOSTNAME} Root CA
+emailAddress = rootcertificate@${HOSTNAME}.${DOMAIN}
