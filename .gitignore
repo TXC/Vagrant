@@ -13,10 +13,8 @@ atlassian*
 ### Vagrant template
 # General
 .vagrant/
-ssl/
-logs/
-sites/
 Vagrant.yml
+./ssl.*.sh
 
 # Log files (if you are creating logs in debug mode, uncomment this)
 # *.log
